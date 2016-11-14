@@ -61,8 +61,8 @@ impl Member {
         self.exec_stmt(&mut stmt)
     }
 
-    /// Deletes `Member` from database. Fails if he doesn't exist.
-    pub fn delete(&self, conn: &mut ::rusqlite::Connection) -> ::rusqlite::Result<()> {
+    /// Deletes `Member` from database. Returns Ok(false) if it didn't exist in the first place.
+    pub fn delete(&self, conn: &mut ::rusqlite::Connection) -> ::rusqlite::Result<bool> {
         let mut stmt = try!(conn.prepare(
             "DELETE FROM members
              WHERE uid = ?"
@@ -70,7 +70,7 @@ impl Member {
 
         let uid = self.uid as i64;
         stmt.execute(&[&uid])
-            .map(|_| ())
+            .map(|n| n == 1)
     }
 }
 
@@ -238,5 +238,32 @@ mod tests {
             last_enter_time: None,
             last_leave_time: None,
         });
+    }
+
+    #[test]
+    fn table_ops() {
+        let mut conn = ::rusqlite::Connection::open_in_memory().unwrap();
+        ::create_tables(&mut conn).unwrap();
+
+        let member = ::Member {
+            uid: 42,
+            can_manage_users: false,
+            ban_time: None,
+            last_open_attempt: None,
+            max_auto_inactive: 1800,
+            last_enter_time: None,
+            last_leave_time: None,
+        };
+
+        member.insert(&mut conn).unwrap();
+        member.insert(&mut conn).unwrap_err();
+
+        member.replace(&mut conn).unwrap();
+
+        assert!(member.delete(&mut conn).unwrap());
+        assert!(!member.delete(&mut conn).unwrap());
+
+        member.insert(&mut conn).unwrap();
+        member.delete(&mut conn).unwrap();
     }
 }
