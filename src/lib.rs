@@ -88,7 +88,64 @@ pub struct Tag<'id, 'adata> {
     pub auth_data: Cow<'adata, [u8]>,
 }
 
-// TODO: impl<'a, 'b> Tag<'a, 'b>
+impl<'id, 'adata> Tag<'id, 'adata> {
+    /// Helper function executes prepared statement with self fields bound.
+    fn exec_stmt(&self, stmt: &mut ::rusqlite::Statement) -> ::rusqlite::Result<()> {
+        use std::borrow::Borrow;
+
+        let uid = self.uid as i64;
+        let id: &[u8] = self.id.borrow();
+        let auth_method = self.auth_method as i64;
+        let auth_data: &[u8] = self.auth_data.borrow();
+        stmt.execute(&[&id, &uid, &auth_method, &auth_data])
+            .map(|_| ())
+    }
+
+    /// Inserts `Tag` into database. Fails if it already exists.
+    pub fn insert(&self, conn: &mut ::rusqlite::Connection) -> ::rusqlite::Result<()> {
+        let mut stmt = try!(conn.prepare(
+            "INSERT INTO tags (tag_id, uid, auth_method, auth_data)
+             VALUES (?, ?, ?, ?)"
+        ));
+
+        self.exec_stmt(&mut stmt)
+    }
+
+    /// Inserts `Tag` into database. Replaces old one if it does already exist.
+    pub fn replace(&self, conn: &mut ::rusqlite::Connection) -> ::rusqlite::Result<()> {
+        let mut stmt = try!(conn.prepare(
+            "REPLACE INTO tags (tag_id, uid, auth_method, auth_data)
+             VALUES (?, ?, ?, ?)"
+        ));
+
+        self.exec_stmt(&mut stmt)
+    }
+
+    /// Updates `Tag` in database. Fails if it doesn't exist.
+    pub fn update(&self, conn: &mut ::rusqlite::Connection) -> ::rusqlite::Result<()> {
+        let mut stmt = try!(conn.prepare(
+            "UPDATE tags
+             SET uid = ?2, auth_method = ?3, auth_data = ?4
+             WHERE tag_id = ?1"
+        ));
+
+        self.exec_stmt(&mut stmt)
+    }
+
+    /// Deletes `Tag` from database. Returns Ok(false) if it didn't exist in the first place.
+    pub fn delete(&self, conn: &mut ::rusqlite::Connection) -> ::rusqlite::Result<bool> {
+        use std::borrow::Borrow;
+
+        let mut stmt = try!(conn.prepare(
+            "DELETE FROM members
+             WHERE tag_id = ?"
+        ));
+
+        let id: &[u8] = self.id.borrow();
+        stmt.execute(&[&id])
+            .map(|n| n == 1)
+    }
+}
 
 /// Contains Error types and associated functions.
 mod error {
