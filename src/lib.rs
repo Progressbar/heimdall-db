@@ -137,7 +137,7 @@ impl<'id, 'adata> Tag<'id, 'adata> {
         use std::borrow::Borrow;
 
         let mut stmt = try!(conn.prepare(
-            "DELETE FROM members
+            "DELETE FROM tags
              WHERE tag_id = ?"
         ));
 
@@ -298,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn table_ops() {
+    fn member_table_ops() {
         let mut conn = ::rusqlite::Connection::open_in_memory().unwrap();
         ::create_tables(&mut conn).unwrap();
 
@@ -322,5 +322,29 @@ mod tests {
 
         member.insert(&mut conn).unwrap();
         member.delete(&mut conn).unwrap();
+    }
+
+    #[test]
+    fn tag_table_ops() {
+        let mut conn = ::rusqlite::Connection::open_in_memory().unwrap();
+        ::create_tables(&mut conn).unwrap();
+
+        let tag = ::Tag {
+            id: (b"12345" as &[u8]).into(),
+            uid: 42,
+            auth_method: 0,
+            auth_data: (&[] as &[u8]).into(),
+        };
+
+        tag.insert(&mut conn).unwrap();
+        tag.insert(&mut conn).unwrap_err();
+
+        tag.replace(&mut conn).unwrap();
+
+        assert!(tag.delete(&mut conn).unwrap());
+        assert!(!tag.delete(&mut conn).unwrap());
+
+        tag.insert(&mut conn).unwrap();
+        tag.delete(&mut conn).unwrap();
     }
 }
